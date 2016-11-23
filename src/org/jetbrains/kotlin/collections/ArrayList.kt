@@ -7,9 +7,8 @@ class ArrayList<E> private constructor(
         private var len: Int
 ) : MutableList<E> {
 
-    constructor() : this(
-            arrayOfNulls<Any>(10) as Array<E?>, // todo: unsafe cast
-            0, 10)
+    constructor(initialCapacity: Int = 10) : this(
+            arrayOfNulls<Any>(initialCapacity) as Array<E?>, 0, 0)  // todo: unsafe cast
 
     override val size : Int
         get() = len
