@@ -71,7 +71,8 @@ class ArrayListTest {
         assertTrue(a.toString() == listOf(1, 2, 3).toString())
     }
 
-    @Test fun testSubList() {
+    @Test
+    fun testSubList() {
         val a0 = ArrayList(listOf(0, 1, 2, 3, 4))
         val a = a0.subList(1, 4)
         assertEquals(3, a.size)
@@ -81,5 +82,20 @@ class ArrayListTest {
         assertTrue(a == listOf(1, 2, 3))
         assertTrue(a.hashCode() == listOf(1, 2, 3).hashCode())
         assertTrue(a.toString() == listOf(1, 2, 3).toString())
+    }
+
+    @Test
+    fun testResize() {
+        val a = ArrayList<Int>()
+        val n = 10000
+        for (i in 1..n)
+            assertTrue(a.add(i))
+        assertEquals(n, a.size)
+        for (i in 1..n)
+            assertEquals(i, a[i - 1])
+        a.trimToSize()
+        assertEquals(n, a.size)
+        for (i in 1..n)
+            assertEquals(i, a[i - 1])
     }
 }
