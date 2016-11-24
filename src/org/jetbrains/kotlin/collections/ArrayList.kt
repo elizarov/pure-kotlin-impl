@@ -2,9 +2,9 @@ package org.jetbrains.kotlin.collections
 
 
 class ArrayList<E> private constructor(
-        private var a: Array<E>,
-        private var ofs: Int = 0,
-        private var len: Int = 0
+    private var array: Array<E>,
+    private var offset: Int = 0,
+    private var length: Int = 0
 ) : MutableList<E> {
 
     constructor(initialCapacity: Int = 10) : this(arrayOfLateInitElements(initialCapacity))
@@ -14,67 +14,101 @@ class ArrayList<E> private constructor(
     }
 
     override val size : Int
-        get() = len
+        get() = length
     
-    override fun isEmpty(): Boolean = len == 0
+    override fun isEmpty(): Boolean = length == 0
 
     override fun get(index: Int): E {
-        require(index in indices())
-        return a[ofs + index]
+        checkIndex(index)
+        return array[offset + index]
     }
 
     override fun set(index: Int, element: E): E {
-        require(index in indices())
-        val old = a[ofs + index]
-        a[ofs + index] = element
+        checkIndex(index)
+        val old = array[offset + index]
+        array[offset + index] = element
         return old
     }
 
-    override fun contains(element: E): Boolean = indices().any { index -> a[index] == element }
-    override fun containsAll(elements: Collection<E>): Boolean = elements.all { contains(it) }
-    override fun indexOf(element: E): Int = indices().firstOrNull { index -> a[index] == element } ?: -1
-    override fun lastIndexOf(element: E): Int = indices().reversed().firstOrNull { index -> a[index] == element } ?: -1
+    override fun contains(element: E): Boolean {
+        var i = 0
+        while (i < length) {
+            if (array[i] == element) return true
+            i++
+        }
+        return false
+    }
+
+    override fun containsAll(elements: Collection<E>): Boolean {
+        val it = elements.iterator()
+        while (it.hasNext()) {
+            if (!contains(it.next()))return false
+        }
+        return true
+    }
+
+    override fun indexOf(element: E): Int {
+        var i = 0
+        while (i < length) {
+            if (array[i] == element) return i
+            i++
+        }
+        return -1
+    }
+
+    override fun lastIndexOf(element: E): Int {
+        var i = length - 1
+        while (i >= 0) {
+            if (array[i] == element) return i
+            i--
+        }
+        return -1
+    }
 
     override fun iterator(): MutableIterator<E> = Itr()
     override fun listIterator(): MutableListIterator<E> = Itr()
 
     override fun listIterator(index: Int): MutableListIterator<E> {
-        require(index in itrIndices())
+        checkItrIndex(index)
         return Itr(index)
     }
 
     override fun add(element: E): Boolean {
         ensureExtraCapacity()
-        a[ofs + len++] = element
+        array[offset + length++] = element
         return true
     }
 
     override fun add(index: Int, element: E) {
         insertAt(index)
-        a[ofs + index] = element
+        array[offset + index] = element
     }
 
     override fun addAll(index: Int, elements: Collection<E>): Boolean {
         val n = elements.size
         insertAt(index, n)
+        var i = 0
         val it = elements.iterator()
-        for (i in 0..n - 1) a[ofs + index + i] = it.next()
+        while (i < n) {
+            array[offset + index + i] = it.next()
+            i++
+        }
         return n > 0
     }
 
-    override fun addAll(elements: Collection<E>): Boolean = addAll(len, elements)
+    override fun addAll(elements: Collection<E>): Boolean = addAll(length, elements)
 
     override fun clear() {
-        a.resetRange(ofs, ofs + len)
-        len = 0
+        array.resetRange(offset, offset + length)
+        length = 0
     }
 
     override fun removeAt(index: Int): E {
-        require(index in indices())
-        val old = a[ofs + index]
-        a.copyRange(ofs + index + 1, ofs + len, ofs + index)
-        a.resetAt(ofs + len - 1)
-        len--
+        checkIndex(index)
+        val old = array[offset + index]
+        array.copyRange(offset + index + 1, offset + length, offset + index)
+        array.resetAt(offset + length - 1)
+        length--
         return old
     }
 
@@ -86,7 +120,10 @@ class ArrayList<E> private constructor(
 
     override fun removeAll(elements: Collection<E>): Boolean {
         var changed = false
-        elements.forEach { if (remove(it)) changed = true }
+        val it = elements.iterator()
+        while (it.hasNext()) {
+            if (remove(it.next())) changed = true
+        }
         return changed
     }
 
@@ -95,82 +132,104 @@ class ArrayList<E> private constructor(
     }
 
     override fun subList(fromIndex: Int, toIndex: Int): MutableList<E> {
-        require(fromIndex in itrIndices())
-        require(toIndex in fromIndex..len)
-        return ArrayList(a, ofs + fromIndex, toIndex - fromIndex) // todo: mark as sublist...
+        checkItrIndex(fromIndex)
+        checkItrIndex(toIndex, fromIndex)
+        return ArrayList(array, offset + fromIndex, toIndex - fromIndex) // todo: mark as sublist...
     }
 
     fun trimToSize() {
-        if (len < a.size)
-            a = a.copyOfLateInitElements(len)
+        if (length < array.size)
+            array = array.copyOfLateInitElements(length)
     }
 
     fun ensureCapacity(capacity: Int) {
-        if (capacity > a.size)
-            a = a.copyOfLateInitElements(capacity.coerceAtLeast(a.size * 3 / 2))
+        if (capacity > array.size)
+            array = array.copyOfLateInitElements(capacity.coerceAtLeast(array.size * 3 / 2))
     }
 
     override fun equals(other: Any?): Boolean {
         return other === this ||
             (other is List<*>) &&
-            (other.size == len) &&
-            indices().all { index -> other[index] == a[ofs + index] }
+            contentEquals(other)
     }
 
     override fun hashCode(): Int {
         var result = 1
-        indices().forEach { index -> result = result * 31 + (a[ofs + index]?.hashCode() ?: 0) }
+        var i = 0
+        while (i < length) {
+            result = result * 31 + (array[offset + i]?.hashCode() ?: 0)
+            i++
+        }
         return result
     }
 
-    override fun toString(): String = StringBuilder(2 + len * 3).apply {
-        append("[")
-        indices().forEach { index ->
-            if (index > 0) append(", ")
-            append(a[ofs + index])
+    override fun toString(): String {
+        val sb = StringBuilder(2 + length * 3)
+        sb.append("[")
+        var i = 0
+        while (i < length) {
+            if (i > 0) sb.append(", ")
+            sb.append(array[offset + i])
+            i++
         }
-        append("]")
-    }.toString()
+        sb.append("]")
+        return sb.toString()
+    }
 
     // ---------------------------- private ----------------------------
 
     private fun ensureExtraCapacity(n: Int = 1) {
-        ensureCapacity(len + n)
+        ensureCapacity(length + n)
     }
 
     private fun insertAt(index: Int, n: Int = 1) {
         ensureExtraCapacity(n)
-        a.copyRange(ofs + index, ofs + size, ofs + index + n)
-        len += n
+        array.copyRange(offset + index, offset + size, offset + index + n)
+        length += n
     }
 
-    private fun indices() = 0..len - 1
-    private fun itrIndices() = 0..len
+    private fun checkIndex(index: Int) {
+        if (index < 0 || index >= length) throw IndexOutOfBoundsException()
+    }
+
+    private fun checkItrIndex(index: Int, fromIndex: Int = 0) {
+        if (index < fromIndex || index > length) throw IndexOutOfBoundsException()
+    }
+
+    private fun contentEquals(other: List<*>): Boolean {
+        if (length != other.size) return false
+        var i = 0
+        while (i < length) {
+            if (array[offset + i] != other[i]) return false
+            i++
+        }
+        return true
+    }
 
     private inner class Itr(private var index: Int = 0) : MutableListIterator<E> {
         private var lastIndex: Int = -1
 
         override fun hasPrevious(): Boolean = index > 0
-        override fun hasNext(): Boolean = index < len
+        override fun hasNext(): Boolean = index < length
 
         override fun previousIndex(): Int = index - 1
         override fun nextIndex(): Int = index
 
         override fun previous(): E {
-            check(index > 0)
+            if (index <= 0) throw IndexOutOfBoundsException()
             lastIndex = --index
-            return a[ofs + lastIndex]
+            return array[offset + lastIndex]
         }
 
         override fun next(): E {
-            check(index < len)
+            if (index >= length) throw IndexOutOfBoundsException()
             lastIndex = index++
-            return a[ofs + lastIndex]
+            return array[offset + lastIndex]
         }
 
         override fun set(element: E) {
-            require(lastIndex in indices())
-            a[ofs + lastIndex] = element
+            checkIndex(lastIndex)
+            array[offset + lastIndex] = element
         }
 
         override fun add(element: E) {
