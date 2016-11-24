@@ -110,7 +110,7 @@ class ArrayList<E> private constructor(
     override fun removeAt(index: Int): E {
         checkIndex(index)
 
-        val old = a[offset + index]
+        val old = array[offset + index]
         removeRange(index, index + 1)
 
         return old
@@ -118,17 +118,17 @@ class ArrayList<E> private constructor(
 
     private fun removeRange(fromIndex: Int, toIndex: Int): Int {
         checkIndex(fromIndex)
-        require(toIndex in itrIndices())
+        checkItrIndex(toIndex)
         require(fromIndex <= toIndex)
 
         val arrayIndex = offset + fromIndex
         val rangeLength = toIndex - fromIndex
 
         if (fromIndex == 0) {
-            a.resetRange(arrayIndex, arrayIndex + rangeLength)
+            array.resetRange(arrayIndex, arrayIndex + rangeLength)
             offset += rangeLength
         } else {
-            array.copyRange(arrayIndex + rangeLength, offet + length, arrayIndex)
+            array.copyRange(arrayIndex + rangeLength, offset + length, arrayIndex)
             array.resetAt(offset + length - rangeLength)
         }
 
@@ -162,8 +162,8 @@ class ArrayList<E> private constructor(
         var removeRangeStart = -1
         var index = 0
 
-        while (index < len) {
-            if (predicate(a[ofs + index])) {
+        while (index < length) {
+            if (predicate(array[offset + index])) {
                 if (removeRangeStart == -1) {
                     removeRangeStart = index
                 }
@@ -180,7 +180,7 @@ class ArrayList<E> private constructor(
 
         if (removeRangeStart != -1) {
             changed = true
-            removeRange(removeRangeStart, len)
+            removeRange(removeRangeStart, length)
         }
 
         return changed
@@ -235,11 +235,11 @@ class ArrayList<E> private constructor(
 
     private fun ensureExtraCapacity(n: Int = 1) {
         ensureCapacity(length + n)
-        if (a.size - (ofs + length) < n) {
+        if (array.size - (offset + length) < n) {
             // roll array
-            a.copyRange(ofs, ofs + length, 0)
-            a.resetRange(len, ofs + length)
-            ofs = 0
+            array.copyRange(offset, offset + length, 0)
+            array.resetRange(length, offset + length)
+            offset = 0
         }
     }
 
