@@ -1,14 +1,17 @@
 package org.jetbrains.kotlin.collections
 
-@Suppress("UNCHECKED_CAST")
+
 class ArrayList<E> private constructor(
-        private var a: Array<E?>,
-        private var ofs: Int,
-        private var len: Int
+        private var a: Array<E>,
+        private var ofs: Int = 0,
+        private var len: Int = 0
 ) : MutableList<E> {
 
-    constructor(initialCapacity: Int = 10) : this(
-            arrayOfNulls<Any>(initialCapacity) as Array<E?>, 0, 0)  // todo: unsafe cast
+    constructor(initialCapacity: Int = 10) : this(arrayOfLazyInitElements(initialCapacity))
+
+    constructor(c: Collection<E>) : this(c.size) {
+        addAll(c)
+    }
 
     override val size : Int
         get() = len
@@ -17,12 +20,12 @@ class ArrayList<E> private constructor(
 
     override fun get(index: Int): E {
         require(index in indices())
-        return a[ofs + index] as E
+        return a[ofs + index]
     }
 
     override fun set(index: Int, element: E): E {
         require(index in indices())
-        val old = a[ofs + index] as E
+        val old = a[ofs + index]
         a[ofs + index] = element
         return old
     }
@@ -36,12 +39,12 @@ class ArrayList<E> private constructor(
     override fun listIterator(): MutableListIterator<E> = Itr()
 
     override fun listIterator(index: Int): MutableListIterator<E> {
-        require(index in iterIndices())
+        require(index in itrIndices())
         return Itr(index)
     }
 
     override fun add(element: E): Boolean {
-        checkResize()
+        ensureExtraCapacity()
         a[ofs + len++] = element
         return true
     }
@@ -59,19 +62,18 @@ class ArrayList<E> private constructor(
         return n > 0
     }
 
-    override fun addAll(elements: Collection<E>): Boolean = addAll(len - 1, elements)
+    override fun addAll(elements: Collection<E>): Boolean = addAll(len, elements)
 
     override fun clear() {
-        for (i in indices()) a[ofs + i] = null
+        a.resetRange(ofs, ofs + len)
         len = 0
     }
 
     override fun removeAt(index: Int): E {
         require(index in indices())
-        val old = a[ofs + index] as E
-        a[ofs + index] = null
-        for (i in index..len - 2) a[ofs + i] = a[ofs + i + 1]
-        a[ofs + len - 1] = null
+        val old = a[ofs + index]
+        a.copyRange(ofs + index + 1, ofs + len, ofs + index)
+        a.resetAt(ofs + len - 1)
         len--
         return old
     }
@@ -93,25 +95,57 @@ class ArrayList<E> private constructor(
     }
 
     override fun subList(fromIndex: Int, toIndex: Int): MutableList<E> {
-        require(fromIndex in iterIndices())
+        require(fromIndex in itrIndices())
         require(toIndex in fromIndex..len)
         return ArrayList(a, ofs + fromIndex, toIndex - fromIndex) // todo: mark as sublist...
     }
 
-    private fun checkResize(n: Int = 1) {
-        val newSize = len + n
-        if (newSize > a.size)
-            a = a.copyOf(newSize.coerceAtLeast(len * 3 / 2)) // todo: copyOf jvm only
+    fun trimToSize() {
+        if (len < a.size)
+            a = a.copyOfLazyInitElements(len)
+    }
+
+    fun ensureCapacity(capacity: Int) {
+        if (capacity > a.size)
+            a = a.copyOfLazyInitElements(capacity.coerceAtLeast(a.size * 3 / 2))
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other === this ||
+            (other is List<*>) &&
+            (other.size == len) &&
+            indices().all { index -> other[index] == a[ofs + index] }
+    }
+
+    override fun hashCode(): Int {
+        var result = 1
+        indices().forEach { index -> result = result * 31 + (a[ofs + index]?.hashCode() ?: 0) }
+        return result
+    }
+
+    override fun toString(): String = StringBuilder(2 + len * 3).apply {
+        append("[")
+        indices().forEach { index ->
+            if (index > 0) append(", ")
+            append(a[ofs + index])
+        }
+        append("]")
+    }.toString()
+
+    // ---------------------------- private ----------------------------
+
+    private fun ensureExtraCapacity(n: Int = 1) {
+        ensureCapacity(len + n)
     }
 
     private fun insertAt(index: Int, n: Int = 1) {
-        checkResize(n)
-        for (i in len - 1 downTo index) // todo: more efficient array copy?
-            a[ofs + i + n] = a[ofs + i]
+        ensureExtraCapacity(n)
+        a.copyRange(ofs + index, ofs + size, ofs + index + n)
+        len += n
     }
 
     private fun indices() = 0..len - 1
-    private fun iterIndices() = 0..len
+    private fun itrIndices() = 0..len
 
     private inner class Itr(private var index: Int = 0) : MutableListIterator<E> {
         private var lastIndex: Int = -1
@@ -125,13 +159,13 @@ class ArrayList<E> private constructor(
         override fun previous(): E {
             check(index > 0)
             lastIndex = --index
-            return a[ofs + lastIndex] as E
+            return a[ofs + lastIndex]
         }
 
         override fun next(): E {
             check(index < len)
             lastIndex = index++
-            return a[ofs + lastIndex] as E
+            return a[ofs + lastIndex]
         }
 
         override fun set(element: E) {
