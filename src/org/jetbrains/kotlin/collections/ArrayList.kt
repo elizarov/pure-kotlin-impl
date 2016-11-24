@@ -15,7 +15,10 @@ class ArrayList<E> private constructor(
 
     override val size : Int
         get() = length
-    
+
+    val capacity: Int
+        get() = a.size
+
     override fun isEmpty(): Boolean = length == 0
 
     override fun get(index: Int): E {
@@ -100,15 +103,29 @@ class ArrayList<E> private constructor(
 
     override fun clear() {
         array.resetRange(offset, offset + length)
+        offset = 0
         length = 0
     }
 
     override fun removeAt(index: Int): E {
         checkIndex(index)
-        val old = array[offset + index]
-        array.copyRange(offset + index + 1, offset + length, offset + index)
-        array.resetAt(offset + length - 1)
+
+        val arrayIndex = offset + index
+        val old = array[arrayIndex]
+
+        if (index == 0) {
+            array.resetAt(arrayIndex)
+            offset++
+        } else {
+            array.copyRange(arrayIndex + 1, offet + length, arrayIndex)
+            array.resetAt(offset + length - 1)
+        }
+
         length--
+        if (length == 0) {
+            offset = 0
+        }
+
         return old
     }
 
@@ -180,6 +197,12 @@ class ArrayList<E> private constructor(
 
     private fun ensureExtraCapacity(n: Int = 1) {
         ensureCapacity(length + n)
+        if (a.size - (ofs + length) < n) {
+            // roll array
+            a.copyRange(ofs, ofs + length, 0)
+            a.resetRange(len, ofs + length)
+            ofs = 0
+        }
     }
 
     private fun insertAt(index: Int, n: Int = 1) {
