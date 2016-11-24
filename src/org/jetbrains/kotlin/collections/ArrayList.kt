@@ -7,7 +7,7 @@ class ArrayList<E> private constructor(
         private var len: Int = 0
 ) : MutableList<E> {
 
-    constructor(initialCapacity: Int = 10) : this(arrayOfLazyInitElements(initialCapacity))
+    constructor(initialCapacity: Int = 10) : this(arrayOfLateInitElements(initialCapacity))
 
     constructor(c: Collection<E>) : this(c.size) {
         addAll(c)
@@ -102,12 +102,12 @@ class ArrayList<E> private constructor(
 
     fun trimToSize() {
         if (len < a.size)
-            a = a.copyOfLazyInitElements(len)
+            a = a.copyOfLateInitElements(len)
     }
 
     fun ensureCapacity(capacity: Int) {
         if (capacity > a.size)
-            a = a.copyOfLazyInitElements(capacity.coerceAtLeast(a.size * 3 / 2))
+            a = a.copyOfLateInitElements(capacity.coerceAtLeast(a.size * 3 / 2))
     }
 
     override fun equals(other: Any?): Boolean {
