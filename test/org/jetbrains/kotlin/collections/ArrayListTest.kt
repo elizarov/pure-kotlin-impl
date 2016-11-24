@@ -51,6 +51,18 @@ class ArrayListTest {
         assertFalse(it.hasNext())
     }
 
+    @Test fun testRemove() {
+        val a = ArrayList(listOf(1, 2, 3))
+        assertTrue(a.remove(2))
+        assertEquals(2, a.size)
+        assertEquals(1, a[0])
+        assertEquals(3, a[1])
+        assertFalse(a.remove(2))
+        assertEquals(2, a.size)
+        assertEquals(1, a[0])
+        assertEquals(3, a[1])
+    }
+
     @Test
     fun testEquals() {
         val a = ArrayList(listOf(1, 2, 3))
