@@ -17,7 +17,7 @@ class ArrayList<E> private constructor(
         get() = length
 
     val capacity: Int
-        get() = a.size
+        get() = array.size
 
     override fun isEmpty(): Boolean = length == 0
 
@@ -110,23 +110,34 @@ class ArrayList<E> private constructor(
     override fun removeAt(index: Int): E {
         checkIndex(index)
 
-        val arrayIndex = offset + index
-        val old = array[arrayIndex]
+        val old = a[offset + index]
+        removeRange(index, index + 1)
 
-        if (index == 0) {
-            array.resetAt(arrayIndex)
-            offset++
+        return old
+    }
+
+    private fun removeRange(fromIndex: Int, toIndex: Int): Int {
+        checkIndex(fromIndex)
+        require(toIndex in itrIndices())
+        require(fromIndex <= toIndex)
+
+        val arrayIndex = offset + fromIndex
+        val rangeLength = toIndex - fromIndex
+
+        if (fromIndex == 0) {
+            a.resetRange(arrayIndex, arrayIndex + rangeLength)
+            offset += rangeLength
         } else {
-            array.copyRange(arrayIndex + 1, offet + length, arrayIndex)
-            array.resetAt(offset + length - 1)
+            array.copyRange(arrayIndex + rangeLength, offet + length, arrayIndex)
+            array.resetAt(offset + length - rangeLength)
         }
 
-        length--
+        length -= rangeLength
         if (length == 0) {
             offset = 0
         }
 
-        return old
+        return rangeLength
     }
 
     override fun remove(element: E): Boolean {
@@ -136,16 +147,43 @@ class ArrayList<E> private constructor(
     }
 
     override fun removeAll(elements: Collection<E>): Boolean {
-        var changed = false
-        val it = elements.iterator()
-        while (it.hasNext()) {
-            if (remove(it.next())) changed = true
-        }
-        return changed
+        return inplaceFilter { it in elements }
     }
 
     override fun retainAll(elements: Collection<E>): Boolean {
-        TODO("not implemented")
+        return inplaceFilter { it !in elements }
+    }
+
+    /**
+     * removes all elements for that the [predicate] returns true
+     */
+    private inline fun inplaceFilter(predicate: (E) -> Boolean): Boolean {
+        var changed = false
+        var removeRangeStart = -1
+        var index = 0
+
+        while (index < len) {
+            if (predicate(a[ofs + index])) {
+                if (removeRangeStart == -1) {
+                    removeRangeStart = index
+                }
+            } else {
+                if (removeRangeStart != -1) {
+                    changed = true
+                    index -= removeRange(removeRangeStart, index)
+                    removeRangeStart = -1
+                }
+            }
+
+            index ++
+        }
+
+        if (removeRangeStart != -1) {
+            changed = true
+            removeRange(removeRangeStart, len)
+        }
+
+        return changed
     }
 
     override fun subList(fromIndex: Int, toIndex: Int): MutableList<E> {
