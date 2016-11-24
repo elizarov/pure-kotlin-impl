@@ -63,6 +63,84 @@ class ArrayListTest {
         assertEquals(3, a[1])
     }
 
+    @Test fun testRemoveAtFromEnd() {
+        val a = ArrayList(listOf(1, 2, 3))
+
+        assertEquals(3, a.size)
+        a.removeAt(2)
+        assertEquals(2, a.size)
+        assertEquals(listOf(1, 2), a.toList())
+
+        a.removeAt(1)
+        assertEquals(1, a.size)
+        assertEquals(listOf(1), a.toList())
+
+        a.removeAt(0)
+        assertEquals(0, a.size)
+        assertEquals(listOf<Int>(), a.toList())
+    }
+
+    @Test fun testRemoveAtStart() {
+        val a = ArrayList<Int>(5)
+        a.addAll(listOf(1, 2, 3))
+
+        assertEquals(3, a.size)
+        a.removeAt(0)
+        assertEquals(2, a.size)
+        assertEquals(listOf(2, 3), a.toList())
+
+        a.addAll(1..3)
+        assertEquals(5, a.size)
+        assertEquals(listOf(2, 3, 1, 2, 3), a.toList())
+        assertEquals(5, a.capacity) // no array growth
+    }
+
+    @Test fun testRemoveInTheMiddle() {
+        val a = ArrayList(listOf(1, 2, 3))
+
+        assertEquals(3, a.size)
+        a.removeAt(1)
+        assertEquals(2, a.size)
+        assertEquals(listOf(1, 3), a.toList())
+    }
+
+    @Test fun testRemoveAll() {
+        val a = ArrayList(listOf(1, 2, 3))
+
+        assertFalse(a.removeAll(5..10))
+        assertEquals(3, a.size)
+
+        assertTrue(a.removeAll(1..10))
+        assertEquals(0, a.size)
+    }
+
+    @Test fun testRemoveAll2() {
+        val a = ArrayList(listOf(1, 2, 3))
+
+        assertFalse(a.removeAll(5..10))
+        assertEquals(3, a.size)
+
+        assertTrue(a.removeAll(1..2))
+        assertEquals(1, a.size)
+        assertEquals(listOf(3), a.toList())
+    }
+
+    @Test fun testRemoveAll3() {
+        val a = ArrayList(listOf(1, 2, 3))
+
+        assertTrue(a.removeAll(2..3))
+        assertEquals(1, a.size)
+        assertEquals(listOf(1), a.toList())
+    }
+
+    @Test fun testRemoveAll4() {
+        val a = ArrayList((1..10).toList())
+
+        assertTrue(a.removeAll((2..3) + (6..8)))
+        assertEquals(5, a.size)
+        assertEquals(listOf(1, 4, 5, 9, 10), a.toList())
+    }
+
     @Test
     fun testEquals() {
         val a = ArrayList(listOf(1, 2, 3))
