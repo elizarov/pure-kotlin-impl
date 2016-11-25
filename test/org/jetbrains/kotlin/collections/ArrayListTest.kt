@@ -182,14 +182,42 @@ class ArrayListTest {
     }
 
     @Test
+    fun testSubListSubLIstClear() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5", "6"))
+        val s = a.subList(1, 5)
+        val q = s.subList(1, 3)
+        assertEquals(listOf("2", "3", "4", "5"), s)
+        assertEquals(listOf("3", "4"), q)
+
+        q.clear()
+        assertEquals(listOf<String>(), q)
+        assertEquals(listOf("2", "5"), s)
+        assertEquals(listOf("1", "2", "5", "6"), a)
+    }
+
+    @Test
     fun testSubListAdd() {
         val a = ArrayList(listOf("1", "2", "3", "4"))
         val s = a.subList(1, 3)
         assertEquals(listOf("2", "3"), s)
 
-        s.add("5")
+        assertTrue(s.add("5"))
         assertEquals(listOf("2", "3", "5"), s)
         assertEquals(listOf("1", "2", "3", "5", "4"), a)
+    }
+
+    @Test
+    fun testSubListSubLIstAdd() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5", "6"))
+        val s = a.subList(1, 5)
+        val q = s.subList(1, 3)
+        assertEquals(listOf("2", "3", "4", "5"), s)
+        assertEquals(listOf("3", "4"), q)
+
+        assertTrue(q.add("7"))
+        assertEquals(listOf("3", "4", "7"), q)
+        assertEquals(listOf("2", "3", "4", "7", "5"), s)
+        assertEquals(listOf("1", "2", "3", "4", "7", "5", "6"), a)
     }
 
     @Test
@@ -198,9 +226,23 @@ class ArrayListTest {
         val s = a.subList(1, 3)
         assertEquals(listOf("2", "3"), s)
 
-        s.addAll(listOf("5", "6"))
+        assertTrue(s.addAll(listOf("5", "6")))
         assertEquals(listOf("2", "3", "5", "6"), s)
         assertEquals(listOf("1", "2", "3", "5", "6", "4"), a)
+    }
+
+    @Test
+    fun testSubListSubListAddAll() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5", "6"))
+        val s = a.subList(1, 5)
+        val q = s.subList(1, 3)
+        assertEquals(listOf("2", "3", "4", "5"), s)
+        assertEquals(listOf("3", "4"), q)
+
+        assertTrue(q.addAll(listOf("7", "8")))
+        assertEquals(listOf("3", "4", "7", "8"), q)
+        assertEquals(listOf("2", "3", "4", "7", "8", "5"), s)
+        assertEquals(listOf("1", "2", "3", "4", "7", "8", "5", "6"), a)
     }
 
     @Test
@@ -209,9 +251,23 @@ class ArrayListTest {
         val s = a.subList(1, 4)
         assertEquals(listOf("2", "3", "4"), s)
 
-        s.removeAt(1)
+        assertEquals("3", s.removeAt(1))
         assertEquals(listOf("2", "4"), s)
         assertEquals(listOf("1", "2", "4", "5"), a)
+    }
+
+    @Test
+    fun testSubListSubListRemoveAt() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5", "6", "7"))
+        val s = a.subList(1, 6)
+        val q = s.subList(1, 4)
+        assertEquals(listOf("2", "3", "4", "5", "6"), s)
+        assertEquals(listOf("3", "4", "5"), q)
+
+        assertEquals("4", q.removeAt(1))
+        assertEquals(listOf("3", "5"), q)
+        assertEquals(listOf("2", "3", "5", "6"), s)
+        assertEquals(listOf("1", "2", "3", "5", "6", "7"), a)
     }
 
     @Test
@@ -220,9 +276,23 @@ class ArrayListTest {
         val s = a.subList(1, 4)
         assertEquals(listOf("2", "3", "4"), s)
 
-        s.removeAll(listOf("3", "5"))
+        assertTrue(s.removeAll(listOf("3", "5")))
         assertEquals(listOf("2", "4"), s)
         assertEquals(listOf("1", "2", "4", "5"), a)
+    }
+
+    @Test
+    fun testSubListSubListRemoveAll() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5", "6", "7"))
+        val s = a.subList(1, 6)
+        val q = s.subList(1, 4)
+        assertEquals(listOf("2", "3", "4", "5", "6"), s)
+        assertEquals(listOf("3", "4", "5"), q)
+
+        assertTrue(q.removeAll(listOf("4", "6")))
+        assertEquals(listOf("3", "5"), q)
+        assertEquals(listOf("2", "3", "5", "6"), s)
+        assertEquals(listOf("1", "2", "3", "5", "6", "7"), a)
     }
 
     @Test
@@ -231,9 +301,23 @@ class ArrayListTest {
         val s = a.subList(1, 4)
         assertEquals(listOf("2", "3", "4"), s)
 
-        s.retainAll(listOf("5", "3"))
+        assertTrue(s.retainAll(listOf("5", "3")))
         assertEquals(listOf("3"), s)
         assertEquals(listOf("1", "3", "5"), a)
+    }
+
+    @Test
+    fun testSubListSubListRetainAll() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5", "6", "7"))
+        val s = a.subList(1, 6)
+        val q = s.subList(1, 4)
+        assertEquals(listOf("2", "3", "4", "5", "6"), s)
+        assertEquals(listOf("3", "4", "5"), q)
+
+        assertTrue(q.retainAll(listOf("5", "3")))
+        assertEquals(listOf("3", "5"), q)
+        assertEquals(listOf("2", "3", "5", "6"), s)
+        assertEquals(listOf("1", "2", "3", "5", "6", "7"), a)
     }
 
     @Test
