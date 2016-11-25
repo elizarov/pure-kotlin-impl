@@ -63,6 +63,23 @@ class ArrayListTest {
         assertEquals(3, a[1])
     }
 
+    @Test fun testRemoveAll() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        assertFalse(a.removeAll(listOf(6, 7, 8)))
+        assertEquals(listOf(1, 2, 3, 4, 5), a)
+        assertTrue(a.removeAll(listOf(5, 3, 1)))
+        assertEquals(listOf(2, 4), a)
+    }
+
+    @Test
+    fun testRetainAll() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        assertFalse(a.retainAll(listOf(1, 2, 3, 4, 5)))
+        assertEquals(listOf(1, 2, 3, 4, 5), a)
+        assertTrue(a.retainAll(listOf(5, 3, 1)))
+        assertEquals(listOf(1, 3, 5), a)
+    }
+
     @Test
     fun testEquals() {
         val a = ArrayList(listOf(1, 2, 3))
@@ -109,5 +126,135 @@ class ArrayListTest {
         assertEquals(n, a.size)
         for (i in 1..n)
             assertEquals(i, a[i - 1])
+    }
+
+    @Test
+    fun testSubListContains() {
+        val a = ArrayList(listOf(1, 2, 3, 4))
+        val s = a.subList(1, 3)
+        assertTrue(a.contains(1))
+        assertFalse(s.contains(1))
+        assertTrue(a.contains(2))
+        assertTrue(s.contains(2))
+        assertTrue(a.contains(3))
+        assertTrue(s.contains(3))
+        assertTrue(a.contains(4))
+        assertFalse(s.contains(4))
+    }
+
+    @Test
+    fun testSubListIndexOf() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 1))
+        val s = a.subList(1, 3)
+        assertEquals(0, a.indexOf(1))
+        assertEquals(-1, s.indexOf(1))
+        assertEquals(1, a.indexOf(2))
+        assertEquals(0, s.indexOf(2))
+        assertEquals(2, a.indexOf(3))
+        assertEquals(1, s.indexOf(3))
+        assertEquals(3, a.indexOf(4))
+        assertEquals(-1, s.indexOf(4))
+    }
+
+    @Test
+    fun testSubListLastIndexOf() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 1))
+        val s = a.subList(1, 3)
+        assertEquals(4, a.lastIndexOf(1))
+        assertEquals(-1, s.lastIndexOf(1))
+        assertEquals(1, a.lastIndexOf(2))
+        assertEquals(0, s.lastIndexOf(2))
+        assertEquals(2, a.lastIndexOf(3))
+        assertEquals(1, s.lastIndexOf(3))
+        assertEquals(3, a.lastIndexOf(4))
+        assertEquals(-1, s.lastIndexOf(4))
+    }
+
+    @Test
+    fun testSubListClear() {
+        val a = ArrayList(listOf(1, 2, 3, 4))
+        val s = a.subList(1, 3)
+        assertEquals(listOf(2, 3), s)
+
+        s.clear()
+        assertEquals(listOf<Int>(), s)
+        assertEquals(listOf(1, 4), a)
+    }
+
+    @Test
+    fun testSubListAdd() {
+        val a = ArrayList(listOf(1, 2, 3, 4))
+        val s = a.subList(1, 3)
+        assertEquals(listOf(2, 3), s)
+
+        s.add(5)
+        assertEquals(listOf(2, 3, 5), s)
+        assertEquals(listOf(1, 2, 3, 5, 4), a)
+    }
+
+    @Test
+    fun testSubListAddAll() {
+        val a = ArrayList(listOf(1, 2, 3, 4))
+        val s = a.subList(1, 3)
+        assertEquals(listOf(2, 3), s)
+
+        s.addAll(listOf(5, 6))
+        assertEquals(listOf(2, 3, 5, 6), s)
+        assertEquals(listOf(1, 2, 3, 5, 6, 4), a)
+    }
+
+    @Test
+    fun testSubListRemoveAt() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        val s = a.subList(1, 4)
+        assertEquals(listOf(2, 3, 4), s)
+
+        s.removeAt(1)
+        assertEquals(listOf(2, 4), s)
+        assertEquals(listOf(1, 2, 4, 5), a)
+    }
+
+    @Test
+    fun testSubListRemoveAll() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        val s = a.subList(1, 4)
+        assertEquals(listOf(2, 3, 4), s)
+
+        s.removeAll(listOf(3, 5))
+        assertEquals(listOf(2, 4), s)
+        assertEquals(listOf(1, 2, 4, 5), a)
+    }
+
+    @Test
+    fun testSubListRetainAll() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        val s = a.subList(1, 4)
+        assertEquals(listOf(2, 3, 4), s)
+
+        s.retainAll(listOf(5, 3))
+        assertEquals(listOf(3), s)
+        assertEquals(listOf(1, 3, 5), a)
+    }
+
+    @Test
+    fun testIteratorRemove() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        val it = a.iterator()
+        while (it.hasNext())
+            if (it.next() % 2 == 0)
+                it.remove()
+        assertEquals(listOf(1, 3, 5), a)
+    }
+
+    @Test
+    fun testIteratorAdd() {
+        val a = ArrayList(listOf(1, 2, 3, 4, 5))
+        val it = a.listIterator()
+        while (it.hasNext()) {
+            val next = it.next()
+            if (next % 2 == 0)
+                it.add(-next)
+        }
+        assertEquals(listOf(1, 2, -2, 3, 4, -4, 5), a)
     }
 }
