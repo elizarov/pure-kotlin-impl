@@ -3,14 +3,14 @@ package org.jetbrains.kotlin.collections
 
 class ArrayList<E> private constructor(
     private var array: Array<E>,
-    private var offset: Int = 0,
-    private var length: Int = 0,
-    private val backing: ArrayList<E>? = null
+    private var offset: Int,
+    private var length: Int,
+    private val backing: ArrayList<E>?
 ) : MutableList<E> {
 
     constructor() : this(10)
 
-    constructor(initialCapacity: Int) : this(arrayOfLateInitElements(initialCapacity))
+    constructor(initialCapacity: Int) : this(arrayOfLateInitElements(initialCapacity), 0, 0, null)
 
     constructor(c: Collection<E>) : this(c.size) {
         addAll(c)
