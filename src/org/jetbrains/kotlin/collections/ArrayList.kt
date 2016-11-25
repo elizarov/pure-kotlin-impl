@@ -170,8 +170,12 @@ class ArrayList<E> private constructor(
     }
 
     fun ensureCapacity(capacity: Int) {
-        if (capacity > array.size)
-            array = array.copyOfLateInitElements(capacity.coerceAtLeast(array.size * 3 / 2))
+        if (capacity > array.size) {
+            var newSize = array.size * 3 / 2
+            if (capacity > newSize)
+                newSize = capacity
+            array = array.copyOfLateInitElements(newSize)
+        }
     }
 
     override fun equals(other: Any?): Boolean {
