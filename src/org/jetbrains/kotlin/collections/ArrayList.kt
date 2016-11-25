@@ -18,7 +18,10 @@ class ArrayList<E> private constructor(
 
     override val size : Int
         get() = length
-    
+
+    internal val capacity: Int
+        get() = backing?.capacity ?: array.size
+
     override fun isEmpty(): Boolean = length == 0
 
     override fun get(index: Int): E {
@@ -78,9 +81,11 @@ class ArrayList<E> private constructor(
 
     override fun add(element: E): Boolean {
         if (backing != null) {
+            val oldOffset = backing.offset
             backing.addAtInternal(offset + length, element)
             array = backing.array
             length++
+            offset -= oldOffset - backing.offset
         } else {
             ensureExtraCapacity(1)
             array[offset + length++] = element
@@ -91,8 +96,10 @@ class ArrayList<E> private constructor(
     override fun add(index: Int, element: E) {
         checkInsertIndex(index)
         if (backing != null) {
+            val oldOffset = backing.offset
             backing.addAtInternal(offset + index, element)
             array = backing.array
+            offset -= oldOffset - backing.offset
             length++
         } else {
             addAtInternal(offset + index, element)
@@ -103,9 +110,11 @@ class ArrayList<E> private constructor(
         checkInsertIndex(index)
         val n = elements.size
         if (backing != null) {
+            val oldOffset = backing.offset
             val result = backing.addAllInternal(elements, offset + index, n)
             array = backing.array
             length += n
+            offset -= oldOffset - backing.offset
             return result
         } else {
             return addAllInternal(elements, offset + index, n)
@@ -115,18 +124,23 @@ class ArrayList<E> private constructor(
     override fun addAll(elements: Collection<E>): Boolean = addAll(length, elements)
 
     override fun clear() {
-        if (backing != null)
+        if (backing != null) {
             backing.removeRangeInternal(offset, length)
-        else
+        } else {
             array.resetRange(fromIndex = offset, toIndex = offset + length)
+            offset = 0
+        }
         length = 0
     }
 
     override fun removeAt(index: Int): E {
         checkIndex(index)
         if (backing != null) {
-            val old = backing.removeAtInternal(offset + index)
+            val arrayOffset = offset + index
+            val oldOffset = backing.offset
+            val old = backing.removeAtInternal(arrayOffset)
             length--
+            offset -= oldOffset - backing.offset
             return old
         } else {
             return removeAtInternal(offset + index)
@@ -165,8 +179,9 @@ class ArrayList<E> private constructor(
     }
 
     fun trimToSize() {
-        if (length < array.size)
-            array = array.copyOfLateInitElements(length)
+        if (length < array.size) {
+            replaceArray(length)
+        }
     }
 
     fun ensureCapacity(capacity: Int) {
@@ -174,8 +189,18 @@ class ArrayList<E> private constructor(
             var newSize = array.size * 3 / 2
             if (capacity > newSize)
                 newSize = capacity
-            array = array.copyOfLateInitElements(newSize)
+
+            replaceArray(newSize)
         }
+    }
+
+    private fun replaceArray(newCapacity: Int) {
+        require(newCapacity >= length)
+
+        val newArray = arrayOfLateInitElements<E>(newCapacity)
+        array.copyRangeTo(newArray, offset, offset + length, 0)
+        array = newArray
+        offset = 0
     }
 
     override fun equals(other: Any?): Boolean {
@@ -209,8 +234,17 @@ class ArrayList<E> private constructor(
 
     // ---------------------------- private ----------------------------
 
-    private fun ensureExtraCapacity(n: Int) {
+    private fun ensureExtraCapacity(n: Int): Int {
         ensureCapacity(length + n)
+        if (array.size - (offset + length) < n) {
+            // roll array
+            array.copyRange(offset, offset + length, 0)
+            array.resetRange(length, offset + length)
+            val delta = offset
+            offset = 0
+            return delta
+        }
+        return 0
     }
 
     private fun checkIndex(index: Int) {
@@ -235,39 +269,68 @@ class ArrayList<E> private constructor(
         return true
     }
 
-    private fun insertAtInternal(i: Int, n: Int) {
-        ensureExtraCapacity(n)
-        array.copyRange(fromIndex = i, toIndex = offset + length, destinationIndex = i + n)
+    private fun insertAtInternal(i: Int, n: Int): Int {
+        require(backing == null)
+
+        val delta = ensureExtraCapacity(n)
+        array.copyRange(fromIndex = i - delta, toIndex = offset + length, destinationIndex = i + n - delta)
         length += n
+        return delta
     }
 
     private fun addAtInternal(i: Int, element: E) {
-        insertAtInternal(i, 1)
-        array[i] = element
+        require(backing == null)
+
+        val delta = insertAtInternal(i, 1)
+        array[i - delta] = element
     }
 
     private fun addAllInternal(elements: Collection<E>, i: Int, n: Int): Boolean {
-        insertAtInternal(i, n)
+        require(backing == null)
+
+        val delta = insertAtInternal(i, n)
         var j = 0
         val it = elements.iterator()
         while (j < n) {
-            array[i + j] = it.next()
+            array[i + j - delta] = it.next()
             j++
         }
         return n > 0
     }
 
     private fun removeAtInternal(i: Int): E {
+        require(backing == null)
+
         val old = array[i]
-        array.copyRange(fromIndex = i + 1, toIndex = offset + length, destinationIndex = i)
-        array.resetAt(offset + length - 1)
+
+        if (i == offset) {
+            array.resetAt(i)
+            offset ++
+        } else {
+            array.copyRange(fromIndex = i + 1, toIndex = offset + length, destinationIndex = i)
+            array.resetAt(offset + length - 1)
+        }
+
         length--
+
+        if (length == 0) {
+            offset = 0
+        }
+
         return old
     }
 
     private fun removeRangeInternal(rangeOffset: Int, rangeLength: Int) {
-        array.copyRange(fromIndex = rangeOffset + rangeLength, toIndex = length, destinationIndex = rangeOffset)
-        array.resetRange(fromIndex = length - rangeLength, toIndex = length)
+        require(backing == null)
+
+        if (rangeOffset == offset) {
+            array.resetRange(rangeOffset, rangeOffset + rangeLength)
+            offset += rangeLength
+        } else {
+            array.copyRange(fromIndex = rangeOffset + rangeLength, toIndex = length, destinationIndex = rangeOffset)
+            array.resetRange(fromIndex = length - rangeLength, toIndex = length)
+        }
+
         length -= rangeLength
     }
 
