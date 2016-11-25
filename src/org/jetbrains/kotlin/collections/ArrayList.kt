@@ -8,7 +8,9 @@ class ArrayList<E> private constructor(
     private val backing: ArrayList<E>? = null
 ) : MutableList<E> {
 
-    constructor(initialCapacity: Int = 10) : this(arrayOfLateInitElements(initialCapacity))
+    constructor() : this(10)
+
+    constructor(initialCapacity: Int) : this(arrayOfLateInitElements(initialCapacity))
 
     constructor(c: Collection<E>) : this(c.size) {
         addAll(c)
@@ -66,8 +68,8 @@ class ArrayList<E> private constructor(
         return -1
     }
 
-    override fun iterator(): MutableIterator<E> = Itr(this)
-    override fun listIterator(): MutableListIterator<E> = Itr(this)
+    override fun iterator(): MutableIterator<E> = Itr(this, 0)
+    override fun listIterator(): MutableListIterator<E> = Itr(this, 0)
 
     override fun listIterator(index: Int): MutableListIterator<E> {
         checkInsertIndex(index)
@@ -80,7 +82,7 @@ class ArrayList<E> private constructor(
             array = backing.array
             length++
         } else {
-            ensureExtraCapacity()
+            ensureExtraCapacity(1)
             array[offset + length++] = element
         }
         return true
@@ -158,7 +160,7 @@ class ArrayList<E> private constructor(
 
     override fun subList(fromIndex: Int, toIndex: Int): MutableList<E> {
         checkInsertIndex(fromIndex)
-        checkInsertIndex(toIndex, fromIndex)
+        checkInsertIndexFrom(toIndex, fromIndex)
         return ArrayList(array, offset + fromIndex, toIndex - fromIndex, this)
     }
 
@@ -203,7 +205,7 @@ class ArrayList<E> private constructor(
 
     // ---------------------------- private ----------------------------
 
-    private fun ensureExtraCapacity(n: Int = 1) {
+    private fun ensureExtraCapacity(n: Int) {
         ensureCapacity(length + n)
     }
 
@@ -211,7 +213,11 @@ class ArrayList<E> private constructor(
         if (index < 0 || index >= length) throw IndexOutOfBoundsException()
     }
 
-    private fun checkInsertIndex(index: Int, fromIndex: Int = 0) {
+    private fun checkInsertIndex(index: Int) {
+        if (index < 0 || index > length) throw IndexOutOfBoundsException()
+    }
+
+    private fun checkInsertIndexFrom(index: Int, fromIndex: Int) {
         if (index < fromIndex || index > length) throw IndexOutOfBoundsException()
     }
 
@@ -225,14 +231,14 @@ class ArrayList<E> private constructor(
         return true
     }
 
-    private fun insertAtInternal(i: Int, n: Int = 1) {
+    private fun insertAtInternal(i: Int, n: Int) {
         ensureExtraCapacity(n)
         array.copyRange(fromIndex = i, toIndex = offset + length, destinationIndex = i + n)
         length += n
     }
 
     private fun addAtInternal(i: Int, element: E) {
-        insertAtInternal(i)
+        insertAtInternal(i, 1)
         array[i] = element
     }
 
@@ -279,7 +285,7 @@ class ArrayList<E> private constructor(
 
     private class Itr<E>(
             private val list: ArrayList<E>,
-            private var index: Int = 0
+            private var index: Int
     ) : MutableListIterator<E> {
         private var lastIndex: Int = -1
 
