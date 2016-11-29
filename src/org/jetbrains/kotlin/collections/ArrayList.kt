@@ -10,7 +10,7 @@ class ArrayList<E> private constructor(
 
     constructor() : this(10)
 
-    constructor(initialCapacity: Int) : this(arrayOfLateInitElements(initialCapacity), 0, 0, null)
+    constructor(capacity: Int) : this(arrayOfLateInitElements(capacity), 0, 0, null)
 
     constructor(c: Collection<E>) : this(c.size) {
         addAll(c)
