@@ -1,5 +1,6 @@
 package org.jetbrains.kotlin.collections
 
+import org.jetbrains.kotlin.text.StringBuilder
 
 class ArrayList<E> private constructor(
     private var array: Array<E>,
