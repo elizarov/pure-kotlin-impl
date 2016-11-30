@@ -9,7 +9,7 @@ private val emptyArray = emptyArray<Any?>()
  * Attempts to read _uninitialized_ values from this array work in implementation-dependent manner,
  * either throwing exception or returning some value.
  */
-fun intArrayOfUninitializedElement(size: Int): IntArray {
+fun intArrayOfUninitializedElements(size: Int): IntArray {
     // note: Kotlin Native does not have to zero-out allocated memory here
     return IntArray(size)
 }

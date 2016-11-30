@@ -24,7 +24,7 @@ class HashMap<K, V> private constructor(
     constructor(capacity: Int) : this(
         arrayOfUninitializedElements(capacity),
         null,
-        intArrayOfUninitializedElement(capacity),
+        intArrayOfUninitializedElements(capacity),
         IntArray(computeHashSize(capacity)),
         INITIAL_MAX_PROBE_DISTANCE,
         0)
