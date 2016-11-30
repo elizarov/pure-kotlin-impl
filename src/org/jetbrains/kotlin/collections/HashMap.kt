@@ -2,10 +2,10 @@ package org.jetbrains.kotlin.collections
 
 class HashMap<K, V> private constructor(
     private var keysArray: Array<K>,
-    private var valuesArray: Array<V>,
-    private var presenceArray: BooleanArray,
+    private var valuesArray: Array<V>?, // allocated only when actually used, always null in pure HashSet
+    private var presenceArray: IntArray,
     private var hashArray: IntArray,
-    private var maxProbes: Int,
+    private var maxProbeDistance: Int,
     private var length: Int
 ) : MutableMap<K, V> {
     private var hashShift: Int = computeShift(hashSize)
@@ -13,110 +13,131 @@ class HashMap<K, V> private constructor(
     override var size: Int = 0
         private set
 
+    private var keysView: HashSet<K>? = null
+    private var valuesView: HashMapValues<V>? = null
+    private var entriesView: HashMapEntrySet<K, V>? = null
+
     // ---------------------------- functions ----------------------------
 
     constructor() : this(INITIAL_CAPACITY)
 
     constructor(capacity: Int) : this(
-        arrayOfLateInitElements(capacity),
-        arrayOfLateInitElements(capacity),
-        BooleanArray(capacity),
+        arrayOfUninitializedElements(capacity),
+        null,
+        intArrayOfUninitializedElement(capacity),
         IntArray(computeHashSize(capacity)),
-        INITIAL_MAX_PROBES,
+        INITIAL_MAX_PROBE_DISTANCE,
         0)
 
+    constructor(m: Map<K, V>) : this(m.size) {
+        putAll(m)
+    }
+
     override fun isEmpty(): Boolean = size == 0
-
-    fun ensureCapacity(capacity: Int) {
-        if (capacity > this.capacity) {
-            var newSize = this.capacity * 3 / 2
-            if (capacity > newSize) newSize = capacity
-            keysArray = keysArray.copyOfLateInitElements(newSize)
-            valuesArray = valuesArray.copyOfLateInitElements(newSize)
-            presenceArray = presenceArray.copyOf(newSize)
-            val newHashSize = computeHashSize(newSize)
-            if (newHashSize > hashSize) rehash(newHashSize)
-        } else if (length + capacity - size > this.capacity) {
-            rehash(hashSize)
-        }
-    }
-
-    override fun containsKey(key: K): Boolean {
-        var hash = hash(key)
-        var probesLeft = maxProbes
-        while (true)  {
-            val index = hashArray[hash]
-            if (index == 0) return false
-            if (index > 0 && keysArray[index - 1] == key) return true
-            if (--probesLeft == 0) return false
-            if (hash-- == 0) hash = hashSize - 1
-        }
-    }
-
-    override fun containsValue(value: V): Boolean {
-        var i = length
-        while (--i >= 0) {
-            if (presenceArray[i] && valuesArray[i] == value)
-                return true
-        }
-        return false
-    }
+    override fun containsKey(key: K): Boolean = findKey(key) >= 0
+    override fun containsValue(value: V): Boolean = findValue(value) >= 0
 
     override fun get(key: K): V? {
-        var hash = hash(key)
-        var probesLeft = maxProbes
-        while (true)  {
-            val index = hashArray[hash]
-            if (index == 0) return null
-            if (index > 0 && keysArray[index - 1] == key) return valuesArray[index - 1]
-            if (--probesLeft == 0) return null
-            if (hash-- == 0) hash = hashSize - 1
-        }
+        val index = findKey(key)
+        if (index < 0) return null
+        return valuesArray!![index]
     }
 
     override fun put(key: K, value: V): V? {
-        ensureExtraCapacity(1)
-        return putInternal(key, value)
-    }
-
-    override fun putAll(from: Map<out K, V>) {
-       ensureExtraCapacity(from.size)
-       for ((key, value) in from) {
-           putInternal(key, value)
-       }
-    }
-
-    override fun remove(key: K): V? {
-        var hash = hash(key)
-        var probesLeft = maxProbes
-        while (true)  {
-            val index = hashArray[hash]
-            if (index == 0) return null
-            if (index > 0 && keysArray[index - 1] == key) {
-                val oldValue = valuesArray[index - 1]
-                keysArray.resetAt(index - 1)
-                valuesArray.resetAt(index - 1)
-                presenceArray[index - 1] = false
-                hashArray[hash] = TOMBSTONE
-                size--
-                return oldValue
-            }
-            if (--probesLeft == 0) return null
-            if (hash-- == 0) hash = hashSize - 1
+        val index = addKey(key)
+        val valuesArray = allocateValuesArray()
+        if (index < 0) {
+            val oldValue = valuesArray[-index - 1]
+            valuesArray[-index - 1] = value
+            return oldValue
+        } else {
+            valuesArray[index] = value
+            return null
         }
     }
 
-    override val entries: MutableSet<MutableMap.MutableEntry<K, V>>
-        get() = TODO("not implemented")
+    override fun putAll(from: Map<out K, V>) {
+        putAllEntries(from.entries)
+    }
 
-    override val keys: MutableSet<K>
-        get() = TODO("not implemented")
-
-    override val values: MutableCollection<V>
-        get() = TODO("not implemented")
+    override fun remove(key: K): V? {
+        val index = removeKey(key)
+        if (index < 0) return null
+        val valuesArray = valuesArray!!
+        val oldValue = valuesArray[index]
+        valuesArray.resetAt(index)
+        return oldValue
+    }
 
     override fun clear() {
-        TODO("not implemented")
+        // O(length) implementation for hashArray cleanup
+        for (i in 0..length - 1) {
+            val hash = presenceArray[i]
+            if (hash >= 0) {
+                hashArray[hash] = 0
+                presenceArray[i] = TOMBSTONE
+            }
+        }
+        keysArray.resetRange(0, length)
+        valuesArray?.resetRange(0, length)
+        size = 0
+        length = 0
+    }
+
+    override val keys: MutableSet<K> get() {
+        val cur = keysView
+        return if (cur == null) {
+            val new = HashSet(this)
+            keysView = new
+            new
+        } else cur
+    }
+
+    override val values: MutableCollection<V> get() {
+        val cur = valuesView
+        return if (cur == null) {
+            val new = HashMapValues(this)
+            valuesView = new
+            new
+        } else cur
+    }
+
+    override val entries: MutableSet<MutableMap.MutableEntry<K, V>> get() {
+        val cur = entriesView
+        return if (cur == null) {
+            val new = HashMapEntrySet(this)
+            entriesView = new
+            return new
+        } else cur
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other === this ||
+            (other is Map<*, *>) &&
+            contentEquals(other)
+    }
+
+    override fun hashCode(): Int {
+        var result = 0
+        val it = entriesIterator()
+        while (it.hasNext()) {
+            result += it.nextHashCode()
+        }
+        return result
+    }
+
+    override fun toString(): String {
+        val sb = StringBuilder(2 + size * 3)
+        sb.append("{")
+        var i = 0
+        val it = entriesIterator()
+        while (it.hasNext()) {
+            if (i > 0) sb.append(", ")
+            it.nextAppendString(sb)
+            i++
+        }
+        sb.append("}")
+        return sb.toString()
     }
 
     // ---------------------------- private ----------------------------
@@ -128,71 +149,127 @@ class HashMap<K, V> private constructor(
         ensureCapacity(length + n)
     }
 
+    private fun ensureCapacity(capacity: Int) {
+        if (capacity > this.capacity) {
+            var newSize = this.capacity * 3 / 2
+            if (capacity > newSize) newSize = capacity
+            keysArray = keysArray.copyOfUninitializedElements(newSize)
+            valuesArray = valuesArray?.copyOfUninitializedElements(newSize)
+            presenceArray = presenceArray.copyOfUninitializedElements(newSize)
+            val newHashSize = computeHashSize(newSize)
+            if (newHashSize > hashSize) rehash(newHashSize)
+        } else if (length + capacity - size > this.capacity) {
+            rehash(hashSize)
+        }
+    }
+
+    private fun allocateValuesArray(): Array<V> {
+        val curValuesArray = valuesArray
+        if (curValuesArray != null) return curValuesArray
+        val newValuesArray = arrayOfUninitializedElements<V>(capacity)
+        valuesArray = newValuesArray
+        return newValuesArray
+    }
+
     private fun hash(key: K) = (key.hashCode() * MAGIC) ushr hashShift
 
     private fun compact() {
-        TODO("")
+        var i = 0
+        var j = 0
+        val valuesArray = valuesArray
+        while (i < length) {
+            if (presenceArray[i] >= 0) {
+                keysArray[j] = keysArray[i]
+                if (valuesArray != null) valuesArray[j] = valuesArray[i]
+                j++
+            }
+            i++
+        }
+        keysArray.resetRange(j, length)
+        valuesArray?.resetRange(j, length)
+        length = j
+        check(length == size) { "Internal invariant violated during compact: length=$length != size=$size" }
     }
 
     private fun rehash(newHashSize: Int) {
         if (length > size) compact()
-        var tryHashSize = newHashSize
-        retry@ while (true) {
-            if (tryHashSize != hashSize) {
-                hashArray = IntArray(tryHashSize)
-                hashShift = computeShift(tryHashSize)
-            } else {
-                hashArray.fill(0, 0, hashSize)
+        if (newHashSize != hashSize) {
+            hashArray = IntArray(newHashSize)
+            hashShift = computeShift(newHashSize)
+        } else {
+            hashArray.fill(0, 0, hashSize)
+        }
+        var i = 0
+        while (i < length) {
+            if (!putRehash(i++)) {
+                throw IllegalStateException("This cannot happen with fixed magic multiplier and grow-only hash array. " +
+                    "Have object hashCodes changed?")
             }
-            var i = 0
-            while (i < length) {
-                if (!putRehash(i++)) {
-                    // todo: some smarter strategy/heuristic
-                    tryHashSize *= 2
-                    maxProbes *= 2
-                    continue@retry
-                }
-            }
-            return
         }
     }
 
     private fun putRehash(i: Int): Boolean {
         var hash = hash(keysArray[i])
-        var probesLeft = maxProbes
+        var probesLeft = maxProbeDistance
         while (true) {
             val index = hashArray[hash]
             if (index == 0) {
                 hashArray[hash] = i + 1
+                presenceArray[i] = hash
                 return true
             }
-            if (--probesLeft == 0) return false
+            if (--probesLeft < 0) return false
             if (hash-- == 0) hash = hashSize - 1
         }
     }
 
-    private fun putInternal(key: K, value: V): V? {
+    private fun findKey(key: K): Int {
+        var hash = hash(key)
+        var probesLeft = maxProbeDistance
+        while (true)  {
+            val index = hashArray[hash]
+            if (index == 0) return TOMBSTONE
+            if (index > 0 && keysArray[index - 1] == key) return index - 1
+            if (--probesLeft < 0) return TOMBSTONE
+            if (hash-- == 0) hash = hashSize - 1
+        }
+    }
+
+    private fun findValue(value: V): Int {
+        var i = length
+        while (--i >= 0) {
+            if (presenceArray[i] >= 0 && valuesArray!![i] == value)
+                return i
+        }
+        return TOMBSTONE
+    }
+
+    internal fun addKey(key: K): Int {
         retry@ while (true) {
             var hash = hash(key)
-            var probesLeft = maxProbes
+            // put is allowed to grow maxProbeDistance with some limits (resize hash on reaching limits)
+            val tentativeMaxProbeDistance = (maxProbeDistance * 2).coerceAtMost(hashSize / 2)
+            var probeDistance = 0
             while (true) {
                 val index = hashArray[hash]
-                if (index == 0) {
+                if (index <= 0) { // claim or reuse hash slot
+                    if (length >= capacity) {
+                        ensureExtraCapacity(1)
+                        continue@retry
+                    }
                     val putIndex = length++
                     keysArray[putIndex] = key
-                    valuesArray[putIndex] = value
-                    presenceArray[putIndex] = true
+                    presenceArray[putIndex] = hash
                     hashArray[hash] = putIndex + 1
                     size++
-                    return null
+                    if (probeDistance > maxProbeDistance) maxProbeDistance = probeDistance
+                    return putIndex
                 }
-                if (index > 0 && keysArray[index - 1] == key) {
-                    val oldValue = valuesArray[index - 1]
-                    valuesArray[index - 1] = value
-                    return oldValue
+                if (keysArray[index - 1] == key) {
+                    return -index
                 }
-                if (--probesLeft == 0) {
-                    rehash(hashSize * 2) // todo: smarter strategy
+                if (++probeDistance > tentativeMaxProbeDistance) {
+                    rehash(hashSize * 2) // cannot find room even with extra "tentativeMaxProbeDistance" -- grow hash
                     continue@retry
                 }
                 if (hash-- == 0) hash = hashSize - 1
@@ -200,14 +277,302 @@ class HashMap<K, V> private constructor(
         }
     }
 
+    internal fun removeKey(key: K): Int {
+        val index = findKey(key)
+        if (index < 0) return TOMBSTONE
+        removeKeyAt(index)
+        return index
+    }
+
+    private fun removeKeyAt(index: Int) {
+        keysArray.resetAt(index)
+        removeHashAt(presenceArray[index])
+        presenceArray[index] = TOMBSTONE
+        size--
+    }
+
+    private fun removeHashAt(removedHash: Int) {
+        var hash = removedHash
+        var hole = removedHash // will try to patch the hole in hash array
+        var probeDistance = 0
+        var patchAttemptsLeft = (maxProbeDistance * 2).coerceAtMost(hashSize / 2) // don't spend too much effort
+        while (true) {
+            if (hash-- == 0) hash = hashSize - 1
+            if (++probeDistance > maxProbeDistance) {
+                // too far away -- can release the hole, bad case will not happen
+                hashArray[hole] = 0
+                return
+            }
+            val index = hashArray[hash]
+            if (index == 0) {
+                // end of chain -- can release the hole, bad case will not happen
+                hashArray[hole] = 0
+                return
+            }
+            if (index < 0) {
+                // TOMBSTONE FOUND
+                //   - <--- [ TS ] ------ [hole] ---> +
+                //             \------------/
+                //             probeDistance
+                // move tombstone into the hole
+                hashArray[hole] = TOMBSTONE
+                hole = hash
+                probeDistance = 0
+            } else {
+                val otherHash = hash(keysArray[index - 1])
+                // Bad case:
+                //   - <--- [hash] ------ [hole] ------ [otherHash] ---> +
+                //             \------------/
+                //             probeDistance
+                if ((otherHash - hash) and (hashSize - 1) >= probeDistance) {
+                    // move otherHash into the hole, move the hole
+                    hashArray[hole] = index
+                    presenceArray[index - 1] = hole
+                    hole = hash
+                    probeDistance = 0
+                }
+            }
+            // check how long we're patching holes
+            if (--patchAttemptsLeft < 0) {
+                // just place tombstone into the hole
+                hashArray[hole] = TOMBSTONE
+                return
+            }
+        }
+    }
+
+    internal fun containsEntry(entry: Map.Entry<K, V>): Boolean {
+        val index = findKey(entry.key)
+        if (index < 0) return false
+        return valuesArray!![index] == entry.value
+    }
+
+    private fun contentEquals(other: Map<*, *>): Boolean = size == other.size && containsAllEntries(other.entries)
+
+    internal fun containsAllEntries(m: Collection<Map.Entry<*, *>>): Boolean {
+        val it = m.iterator()
+        while (it.hasNext()) {
+            val entry = it.next()
+            try {
+                @Suppress("UNCHECKED_CAST") // todo: get rid of unchecked cast here somehow
+                if (!containsEntry(entry as Map.Entry<K, V>))
+                    return false
+            } catch(e: ClassCastException) {
+                return false
+            }
+        }
+        return true
+    }
+
+    internal fun putEntry(entry: Map.Entry<K, V>): Boolean {
+        val index = addKey(entry.key)
+        val valuesArray = allocateValuesArray()
+        if (index >= 0) {
+            valuesArray[index] = entry.value
+            return true
+        }
+        val oldValue = valuesArray[-index - 1]
+        if (entry.value != oldValue) {
+            valuesArray[-index - 1] = entry.value
+            return true
+        }
+        return false
+    }
+
+    internal fun putAllEntries(from: Collection<Map.Entry<K, V>>): Boolean {
+        if (from.isEmpty()) return false
+        ensureExtraCapacity(from.size)
+        val it = from.iterator()
+        var updated = false
+        while (it.hasNext()) {
+            if (putEntry(it.next()))
+                updated = true
+        }
+        return updated
+    }
+
+    internal fun removeEntry(entry: Map.Entry<K, V>): Boolean {
+        val index = findKey(entry.key)
+        if (index < 0) return false
+        if (valuesArray!![index] != entry.value) return false
+        removeKeyAt(index)
+        return true
+    }
+
+    internal fun removeAllEntries(elements: Collection<Map.Entry<K, V>>): Boolean {
+        if (elements.isEmpty()) return false
+        val it = elements.iterator()
+        var updated = false
+        while (it.hasNext()) {
+            if (removeEntry(it.next()))
+                updated = true
+        }
+        return updated
+    }
+
+    internal fun retainAllEntries(elements: Collection<Map.Entry<K, V>>): Boolean {
+        val it = entriesIterator()
+        var updated = false
+        while (it.hasNext()) {
+            if (!elements.contains(it.next())) {
+                it.remove()
+                updated = true
+            }
+        }
+        return updated
+    }
+
+    internal fun containsAllValues(elements: Collection<V>): Boolean {
+        val it = elements.iterator()
+        while (it.hasNext()) {
+            if (!containsValue(it.next()))
+                return false
+        }
+        return true
+    }
+
+    internal fun removeValue(element: V): Boolean {
+        val index = findValue(element)
+        if (index < 0) return false
+        removeKeyAt(index)
+        return true
+    }
+
+    internal fun removeAllValues(elements: Collection<V>): Boolean {
+        val it = elements.iterator()
+        var updated = false
+        while (it.hasNext()) {
+            if (removeValue(it.next()))
+                updated = true
+        }
+        return updated
+    }
+
+    internal fun retainAllValues(elements: Collection<V>): Boolean {
+        val it = valuesIterator()
+        var updated = false
+        while (it.hasNext()) {
+            if (!elements.contains(it.next())) {
+                it.remove()
+                updated = true
+            }
+        }
+        return updated
+    }
+
+    internal fun keysIterator() = KeysItr(this)
+    internal fun valuesIterator() = ValuesItr(this)
+    internal fun entriesIterator() = EntriesItr(this)
+
     private companion object {
         const val MAGIC = 2654435769L.toInt() // golden ratio
         const val INITIAL_CAPACITY = 8
-        const val INITIAL_MAX_PROBES = 5
+        const val INITIAL_MAX_PROBE_DISTANCE = 2
         const val TOMBSTONE = -1
 
         fun computeHashSize(capacity: Int): Int = (capacity.coerceAtLeast(1) * 3).highestOneBit()
 
         fun computeShift(hashSize: Int): Int = hashSize.numberOfLeadingZeros() + 1
+    }
+
+    internal open class Itr<K, V>(
+        internal val map: HashMap<K, V>
+    ) {
+        internal var index = 0
+        internal var lastIndex: Int = -1
+
+        init {
+            initNext()
+        }
+
+        internal fun initNext() {
+            while (index < map.length && map.presenceArray[index] < 0)
+                index++
+        }
+
+        fun hasNext(): Boolean = index < map.length
+
+        fun remove() {
+            map.removeKeyAt(lastIndex)
+            lastIndex = -1
+        }
+    }
+
+    internal class KeysItr<K, V>(map: HashMap<K, V>) : Itr<K, V>(map), MutableIterator<K> {
+        override fun next(): K {
+            if (index >= map.length) throw IndexOutOfBoundsException()
+            lastIndex = index++
+            val result = map.keysArray[lastIndex]
+            initNext()
+            return result
+        }
+
+    }
+
+    internal class ValuesItr<K, V>(map: HashMap<K, V>) : Itr<K, V>(map), MutableIterator<V> {
+        override fun next(): V {
+            if (index >= map.length) throw IndexOutOfBoundsException()
+            lastIndex = index++
+            val result = map.valuesArray!![lastIndex]
+            initNext()
+            return result
+        }
+    }
+
+    internal class EntriesItr<K, V>(map: HashMap<K, V>) : Itr<K, V>(map),
+            MutableIterator<MutableMap.MutableEntry<K, V>> {
+        override fun next(): EntryRef<K, V> {
+            if (index >= map.length) throw IndexOutOfBoundsException()
+            lastIndex = index++
+            val result = EntryRef(map, lastIndex)
+            initNext()
+            return result
+        }
+
+        internal fun nextHashCode(): Int {
+            if (index >= map.length) throw IndexOutOfBoundsException()
+            lastIndex = index++
+            val result = map.keysArray[lastIndex].hashCode() xor map.valuesArray!![lastIndex].hashCode()
+            initNext()
+            return result
+        }
+
+        fun nextAppendString(sb: java.lang.StringBuilder) {
+            if (index >= map.length) throw IndexOutOfBoundsException()
+            lastIndex = index++
+            val key = map.keysArray[lastIndex]
+            if (key == map) sb.append("(this Map)") else sb.append(key)
+            sb.append('=')
+            val value = map.valuesArray!![lastIndex]
+            if (value == map) sb.append("(this Map)") else sb.append(value)
+            initNext()
+        }
+    }
+
+    internal class EntryRef<K, V>(
+        private val map: HashMap<K, V>,
+        private val index: Int
+    ) : MutableMap.MutableEntry<K, V> {
+        override val key: K
+            get() = map.keysArray[index]
+
+        override val value: V
+            get() = map.valuesArray!![index]
+
+        override fun setValue(newValue: V): V {
+            val valuesArray = map.allocateValuesArray()
+            val oldValue = valuesArray[index]
+            valuesArray[index] = newValue
+            return oldValue
+        }
+
+        override fun equals(other: Any?): Boolean =
+            other is Map.Entry<*, *> &&
+            other.key == key &&
+            other.value == value
+
+        override fun hashCode(): Int = key.hashCode() xor value.hashCode()
+
+        override fun toString(): String = "$key=$value"
     }
 }

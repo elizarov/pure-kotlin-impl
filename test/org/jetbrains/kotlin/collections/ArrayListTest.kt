@@ -51,6 +51,15 @@ class ArrayListTest {
         assertFalse(it.hasNext())
     }
 
+    @Test fun testContainsAll() {
+        val a = ArrayList(listOf("1", "2", "3", "4", "5"))
+        assertFalse(a.containsAll(listOf("6", "7", "8")))
+        assertFalse(a.containsAll(listOf("5", "6", "7")))
+        assertFalse(a.containsAll(listOf("4", "5", "6")))
+        assertTrue(a.containsAll(listOf("3", "4", "5")))
+        assertTrue(a.containsAll(listOf("2", "3", "4")))
+    }
+
     @Test fun testRemove() {
         val a = ArrayList(listOf("1", "2", "3"))
         assertTrue(a.remove("2"))
@@ -84,6 +93,7 @@ class ArrayListTest {
     fun testEquals() {
         val a = ArrayList(listOf("1", "2", "3"))
         assertTrue(a == listOf("1", "2", "3"))
+        assertFalse(a == listOf("2", "3", "1")) // order matters
         assertFalse(a == listOf("1", "2", "4"))
         assertFalse(a == listOf("1", "2"))
     }

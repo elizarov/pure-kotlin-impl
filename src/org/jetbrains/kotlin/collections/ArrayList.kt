@@ -1,7 +1,5 @@
 package org.jetbrains.kotlin.collections
 
-import org.jetbrains.kotlin.text.StringBuilder
-
 class ArrayList<E> private constructor(
     private var array: Array<E>,
     private var offset: Int,
@@ -11,7 +9,7 @@ class ArrayList<E> private constructor(
 
     constructor() : this(10)
 
-    constructor(capacity: Int) : this(arrayOfLateInitElements(capacity), 0, 0, null)
+    constructor(capacity: Int) : this(arrayOfUninitializedElements(capacity), 0, 0, null)
 
     constructor(c: Collection<E>) : this(c.size) {
         addAll(c)
@@ -137,7 +135,7 @@ class ArrayList<E> private constructor(
     fun trimToSize() {
         if (backing != null) throw IllegalStateException() // just in case somebody casts subList to ArrayList
         if (length < array.size)
-            array = array.copyOfLateInitElements(length)
+            array = array.copyOfUninitializedElements(length)
     }
 
     fun ensureCapacity(capacity: Int) {
@@ -146,7 +144,7 @@ class ArrayList<E> private constructor(
             var newSize = array.size * 3 / 2
             if (capacity > newSize)
                 newSize = capacity
-            array = array.copyOfLateInitElements(newSize)
+            array = array.copyOfUninitializedElements(newSize)
         }
     }
 
@@ -166,18 +164,7 @@ class ArrayList<E> private constructor(
         return result
     }
 
-    override fun toString(): String {
-        val sb = StringBuilder(2 + length * 3)
-        sb.append("[")
-        var i = 0
-        while (i < length) {
-            if (i > 0) sb.append(", ")
-            sb.append(array[offset + i])
-            i++
-        }
-        sb.append("]")
-        return sb.toString()
-    }
+    override fun toString(): String = collectionToString()
 
     // ---------------------------- private ----------------------------
 
