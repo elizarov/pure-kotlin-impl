@@ -58,6 +58,34 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
         return removeAt((tail - 1) and (array.size - 1))
     }
 
+    fun pollFirst(): E? {
+        if (isEmpty()) return null
+        return removeFirst()
+    }
+
+    fun pollLast(): E? {
+        if (isEmpty()) return null
+        return removeLast()
+    }
+
+    fun peekFirst(): E? {
+        if (isEmpty()) return null
+        return array[head]
+    }
+
+    fun peekLast(): E? {
+        if (isEmpty()) return null
+        return array[(tail - 1) and (array.size - 1)]
+    }
+
+    fun push(element: E) {
+        addLast(element)
+    }
+
+    fun pop(): E = removeFirst()
+
+    fun poll(): E? = if (isEmpty()) null else removeFirst()
+
     override fun add(element: E): Boolean {
         return addLast(element)
     }

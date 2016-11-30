@@ -1,8 +1,10 @@
 package org.jetbrains.kotlin.collections
 
 import collections.*
+import collections.ArrayDeque
 import org.junit.*
 import org.junit.Assert.*
+import java.util.*
 
 class ArrayDequeTest {
     @Test
@@ -92,23 +94,36 @@ class ArrayDequeTest {
 
         assertEquals(4, d.size)
         assertEquals(listOf(1, 2, 3, 4), d.toList())
+        assertEquals(1, d.peekFirst())
+        assertEquals(4, d.peekLast())
 
         assertEquals(1, d.removeFirst())
         assertEquals(listOf(2, 3, 4), d.toList())
         assertEquals(3, d.size)
+        assertEquals(2, d.peekFirst())
+        assertEquals(4, d.peekLast())
 
         assertEquals(2, d.removeFirst())
         assertEquals(listOf(3, 4), d.toList())
         assertEquals(2, d.size)
+        assertEquals(3, d.peekFirst())
+        assertEquals(4, d.peekLast())
 
         assertEquals(3, d.removeFirst())
         assertEquals(listOf(4), d.toList())
         assertEquals(1, d.size)
+        assertEquals(4, d.peekFirst())
+        assertEquals(4, d.peekLast())
 
         assertEquals(4, d.removeFirst())
         assertEquals(0, d.size)
         assertEquals(listOf<Int>(), d.toList())
         assertTrue(d.isEmpty())
+        assertEquals(null, d.peekFirst())
+        assertEquals(null, d.peekLast())
+        assertEquals(null, d.pollFirst())
+        assertEquals(null, d.pollLast())
+        assertEquals(null, d.poll())
     }
 
     @Test
@@ -118,18 +133,26 @@ class ArrayDequeTest {
 
         assertEquals(4, d.size)
         assertEquals(listOf(1, 2, 3, 4), d.toList())
+        assertEquals(1, d.peekFirst())
+        assertEquals(4, d.peekLast())
 
         assertEquals(4, d.removeLast())
         assertEquals(listOf(1, 2, 3), d.toList())
         assertEquals(3, d.size)
+        assertEquals(1, d.peekFirst())
+        assertEquals(3, d.peekLast())
 
         assertEquals(3, d.removeLast())
         assertEquals(listOf(1, 2), d.toList())
         assertEquals(2, d.size)
+        assertEquals(1, d.peekFirst())
+        assertEquals(2, d.peekLast())
 
         assertEquals(2, d.removeLast())
         assertEquals(listOf(1), d.toList())
         assertEquals(1, d.size)
+        assertEquals(1, d.peekFirst())
+        assertEquals(1, d.peekLast())
 
         assertEquals(1, d.removeLast())
         assertEquals(0, d.size)
@@ -275,4 +298,37 @@ class ArrayDequeTest {
         assertEquals(listOf(-2, 2), d.toList())
     }
 
+    @Test
+    fun pollFirst() {
+        val d = ArrayDeque<Int>()
+        d.addAll(1..4)
+
+        assertEquals(listOf(1, 2, 3, 4, null), (1..5).map { d.pollFirst() })
+    }
+
+    @Test
+    fun pollLast() {
+        val d = ArrayDeque<Int>()
+        d.addAll(1..4)
+
+        assertEquals(listOf(4, 3, 2, 1, null), (1..5).map { d.pollLast() })
+    }
+
+    @Test
+    fun pushAndPop() {
+        val d = ArrayDeque<Int>()
+
+        d.push(1)
+        d.push(2)
+        d.push(3)
+        d.push(4)
+
+        assertEquals(listOf(1, 2, 3, 4), (1..4).map { d.pop() })
+
+        try {
+            d.pop()
+            fail()
+        } catch (expected: NoSuchElementException) {
+        }
+    }
 }
