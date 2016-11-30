@@ -1,7 +1,5 @@
 package org.jetbrains.kotlin.collections
 
-import collections.*
-import collections.ArrayDeque
 import org.junit.*
 import org.junit.Assert.*
 import java.util.*
@@ -200,15 +198,18 @@ class ArrayDequeTest {
         val d = ArrayDeque<Int>(4)
         d.addAll(1..4)
         val it = d.iterator()
+        val visited = mutableListOf<Int>()
 
         while (it.hasNext()) {
             val v = it.next()
+            visited.add(v)
             if (v == 2 || v == 4) {
                 it.remove()
             }
         }
 
         assertEquals(listOf(1, 3), d.toList())
+        assertEquals(listOf(1, 2, 3, 4), visited)
     }
 
     @Test
@@ -223,15 +224,18 @@ class ArrayDequeTest {
         assertEquals(listOf(-2, -1, 1, 2), d.toList())
 
         val it = d.iterator()
+        val visited = mutableListOf<Int>()
 
         while (it.hasNext()) {
             val v = it.next()
+            visited.add(v)
             if (v == -1 || v == 1) {
                 it.remove()
             }
         }
 
         assertEquals(listOf(-2, 2), d.toList())
+        assertEquals(listOf(-2, -1, 1, 2), visited)
     }
 
     @Test
@@ -330,5 +334,135 @@ class ArrayDequeTest {
             fail()
         } catch (expected: NoSuchElementException) {
         }
+    }
+
+    @Test
+    fun descendingIterator() {
+        val d = ArrayDeque<Int>()
+        d.addAll(1..4)
+
+        assertEquals(listOf(4, 3, 2, 1), d.descendingIterator().asSequence().toList())
+    }
+
+    @Test
+    fun descendingIteratorRemove() {
+        val d = ArrayDeque<Int>(4)
+        d.addAll(1..4)
+        val it = d.descendingIterator()
+        val visited = mutableListOf<Int>()
+
+        while (it.hasNext()) {
+            val v = it.next()
+            visited += v
+            if (v == 2 || v == 4) {
+                it.remove()
+            }
+        }
+
+        assertEquals(listOf(1, 3), d.toList())
+        assertEquals(listOf(4, 3, 2, 1), visited)
+    }
+
+    @Test
+    fun descendingIteratorRemoveInShifted() {
+        val d = ArrayDeque<Int>(4)
+        d.addAll(1..4)
+        d.removeLast()
+        d.removeLast()
+        d.addFirst(-1)
+        d.addFirst(-2)
+
+        assertEquals(listOf(-2, -1, 1, 2), d.toList())
+        assertEquals(listOf(2, 1, -1, -2), d.descendingIterator().asSequence().toList())
+
+        val it = d.descendingIterator()
+        val visited = mutableListOf<Int>()
+
+        while (it.hasNext()) {
+            val v = it.next()
+            visited += v
+            if (v == -1 || v == 1) {
+                it.remove()
+            }
+        }
+
+        assertEquals(listOf(-2, 2), d.toList())
+        assertEquals(listOf(2, 1, -1, -2), visited)
+    }
+
+    @Test
+    fun iteratorEmpty() {
+        val d = ArrayDeque<Int>()
+        assertEquals(listOf<Int>(), d.iterator().asSequence().toList())
+    }
+
+    @Test
+    fun descendingIteratorEmpty() {
+        val d = ArrayDeque<Int>()
+        assertEquals(listOf<Int>(), d.descendingIterator().asSequence().toList())
+    }
+
+    @Test
+    fun iteratorRemoveEvery() {
+        val d = ArrayDeque<Int>()
+        d.addAll(1..4)
+        val it = d.iterator()
+        val visited = mutableListOf<Int>()
+
+        while (it.hasNext()) {
+            visited.add(it.next())
+            it.remove()
+        }
+
+        assertTrue(d.isEmpty())
+        assertEquals(listOf(1, 2, 3, 4), visited)
+    }
+
+    @Test
+    fun iteratorRemoveTheOnly() {
+        val d = ArrayDeque<Int>()
+        d.add(1)
+        val it = d.iterator()
+        val visited = mutableListOf<Int>()
+
+        while (it.hasNext()) {
+            visited.add(it.next())
+            it.remove()
+        }
+
+        assertEquals(listOf(1), visited)
+        assertTrue(d.isEmpty())
+    }
+
+    @Test
+    fun descendingIteratorRemoveEvery() {
+        val d = ArrayDeque<Int>()
+        d.addAll(1..4)
+        val it = d.descendingIterator()
+        val visited = mutableListOf<Int>()
+
+        while (it.hasNext()) {
+            visited += it.next()
+            it.remove()
+        }
+
+        assertTrue(d.isEmpty())
+        assertEquals(listOf(4, 3, 2, 1), visited)
+    }
+
+    @Test
+    fun descendingIteratorRemoveTheOnly() {
+        val d = ArrayDeque<Int>()
+        d.add(1)
+        val it = d.descendingIterator()
+        val visited = mutableListOf<Int>()
+
+        while (it.hasNext()) {
+            visited.add(it.next())
+            it.remove()
+        }
+
+        assertEquals(listOf(1), visited)
+        assertTrue(d.isEmpty())
     }
 }

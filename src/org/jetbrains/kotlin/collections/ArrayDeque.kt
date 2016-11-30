@@ -1,12 +1,9 @@
-package collections
-
-import org.jetbrains.kotlin.collections.*
-import java.util.*
+package org.jetbrains.kotlin.collections
 
 class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
     constructor() : this(16)
 
-    private var array: Array<E> = arrayOfLateInitElements(powerOfTwo(initialCapacity))
+    private var array: Array<E> = arrayOfUninitializedElements(powerOfTwo(initialCapacity))
     private var tail = 0
     private var head = 0
     private var full = false
@@ -143,7 +140,11 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
     }
 
     override fun iterator(): MutableIterator<E> {
-        return IteratorImpl(this, modCount)
+        return IteratorImpl(this, modCount, forward = true)
+    }
+
+    fun descendingIterator(): MutableIterator<E> {
+        return IteratorImpl(this, modCount, forward = false)
     }
 
     override fun remove(element: E): Boolean {
@@ -185,7 +186,9 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
         val value = array[index]
         modCount++
 
-        if (index == head) {
+        if (isEmpty()) {
+            throw IllegalArgumentException()
+        } else if (index == head) {
             array.resetAt(index)
             head = (head + 1) and (array.size - 1)
             full = false
@@ -273,7 +276,7 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
 
     private fun grow(minSize: Int) {
         val newSize = size(minSize)
-        val newArray = arrayOfLateInitElements<E>(newSize)
+        val newArray = arrayOfUninitializedElements<E>(newSize)
         modCount++
 
         when {
@@ -319,10 +322,12 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
         return joinToString(prefix = "[", postfix = "]")
     }
 
-    private class IteratorImpl<E>(val owner: ArrayDeque<E>, var modCount: Int) : MutableIterator<E> {
-        private var index = owner.head
+    private class IteratorImpl<E>(val owner: ArrayDeque<E>, var modCount: Int, val forward: Boolean) : MutableIterator<E> {
+        private var index = if (forward) owner.head else ((owner.tail - 1) and (owner.array.size - 1))
         private var couldBeEqual = owner.full
         private var valueIndex = -1
+        private var stopIndex = stopIndex()
+        private val step = if (forward) 1 else -1
 
         override fun remove() {
             assertModCount()
@@ -331,15 +336,24 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
             }
 
             val index = valueIndex
+            val oldHead = owner.head
+
             valueIndex = -1
             owner.removeAt(index)
+
             modCount = owner.modCount
-            this.index = (this.index - 1) and (owner.array.size - 1)
+            stopIndex = stopIndex()
+            this.index = when {
+                index == oldHead && forward -> index + 1
+                forward -> index
+                index == oldHead -> stopIndex
+                else -> ((index - 1) and (owner.array.size - 1))
+            }
         }
 
         override fun hasNext(): Boolean {
             assertModCount()
-            return index != owner.tail || couldBeEqual
+            return !owner.isEmpty() && (index != stopIndex || couldBeEqual)
         }
 
         override fun next(): E {
@@ -352,18 +366,20 @@ class ArrayDeque<E>(initialCapacity: Int) : MutableCollection<E> {
             val result = owner.array[index]
             valueIndex = index
 
-            if (index == owner.tail && couldBeEqual) {
+            if (index == stopIndex && couldBeEqual) {
                 couldBeEqual = false
             }
 
-            index = (index + 1) and (owner.array.size - 1)
+            index = (index + step) and (owner.array.size - 1)
 
             return result
         }
 
+        private fun stopIndex() = if (forward) owner.tail else ((owner.head - 1) and (owner.array.size - 1))
+
         private fun assertModCount() {
             if (modCount != owner.modCount) {
-                throw ConcurrentModificationException()
+                throw IllegalStateException() // should be ConcurrentModificationException
             }
         }
     }
